@@ -134,4 +134,47 @@ docs/archive/                  各阶段原始 Markdown 文档
 
 本次指导过程体现了以下方法：先理解现有代码，再分别审查两题方案；方案通过后实施基础功能；根据本机输出提出可视化需求；在结果保持正确的前提下分轮优化；最后整理文档和运行证据。这样的过程将需求、设计、实现和验证联系起来，也便于后续通过 Git 进行更细的版本管理。
 
-本次环境中 Git 命令仍不可用，因此没有真实提交历史。本文记录的是指导和实施过程，不能替代 Git 日志。
+## 10. 本地 Git 管理过程
+
+代码和文档完成后，我要求检查并使用本机 Git 管理项目。Git 安装完成后，在项目目录初始化本地仓库：
+
+```powershell
+git init -b main
+git add .
+git commit -m "Complete embodied AI programming assignments"
+```
+
+第一次本地提交保存完整的作业代码、运行脚本、题目文件和 Markdown 文档，对应提交：
+
+```text
+6de02a2 Complete embodied AI programming assignments
+```
+
+随后，为了便于同一课程仓库继续存放其他作业，我要求把本次作业整体归入 `homework1` 文件夹。移动后先运行测试，再使用 Git 暂存全部路径变化：
+
+```powershell
+git add -A
+git commit -m "Organize assignment under homework1"
+```
+
+第二次本地提交为：
+
+```text
+5810e33 Organize assignment under homework1
+```
+
+Git 将这次变化识别为 25 个文件的路径重命名，文件内容没有随目录整理而改变。完成后的本地仓库结构为：
+
+```text
+Embodied_AI_Course/
+├─ .git/
+└─ homework1/
+   ├─ 模块1/
+   ├─ 模块2/
+   ├─ docs/
+   ├─ README.md
+   ├─ run.ps1
+   └─ run.sh
+```
+
+本地 Git 记录用于查看每轮提交、比较文件变化和在需要时回到已验证版本。Markdown 中的过程说明用于解释设计思路，两者作用不同；实际版本状态应以 `git log` 和 `git status` 为准。
