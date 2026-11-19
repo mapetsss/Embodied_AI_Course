@@ -1,0 +1,305 @@
+diff --git a/main.py b/main.py
+index 20cfbbc..aa08aa2 100644
+--- a/main.py
++++ b/main.py
+@@ -1,12 +1,8 @@
+ import argparse
+-import datetime
+-import pathlib
+ import sys
+ import time
+-import cv2
+ import lietorch
+ import torch
+-import tqdm
+ import yaml
+ from mast3r_slam.global_opt import FactorGraph
+ 
+@@ -29,19 +25,16 @@ def relocalization(frame, keyframes, factor_graph, retrieval_database):
+     # we are adding and then removing from the keyframe, so we need to be careful.
+     # The lock slows viz down but safer this way...
+     with keyframes.lock:
+-        kf_idx = []
+-        retrieval_inds = retrieval_database.update(
++        kf_idx = retrieval_database.update(
+             frame,
+             add_after_query=False,
+             k=config["retrieval"]["k"],
+             min_thresh=config["retrieval"]["min_thresh"],
+         )
+-        kf_idx += retrieval_inds
+         successful_loop_closure = False
+         if kf_idx:
+             keyframes.append(frame)
+             n_kf = len(keyframes)
+-            kf_idx = list(kf_idx)  # convert to list
+             frame_idx = [n_kf - 1] * len(kf_idx)
+             print("RELOCALIZING against kf ", n_kf - 1, " and ", kf_idx)
+             if factor_graph.add_factors(
+@@ -100,11 +93,8 @@ def run_backend(cfg, model, states, keyframes, K):
+             continue
+ 
+         # Graph Construction
+-        kf_idx = []
+-        # k to previous consecutive keyframes
+-        n_consec = 1
+-        for j in range(min(n_consec, idx)):
+-            kf_idx.append(idx - 1 - j)
++        # Connect the previous consecutive keyframe when one exists.
++        kf_idx = [idx - 1] if idx > 0 else []
+         frame = keyframes[idx]
+         retrieval_inds = retrieval_database.update(
+             frame,
+@@ -139,7 +129,7 @@ def run_backend(cfg, model, states, keyframes, K):
+ 
+         with states.lock:
+             if len(states.global_optimizer_tasks) > 0:
+-                idx = states.global_optimizer_tasks.pop(0)
++                states.global_optimizer_tasks.pop(0)
+ 
+ 
+ if __name__ == "__main__":
+@@ -147,8 +137,6 @@ if __name__ == "__main__":
+     torch.backends.cuda.matmul.allow_tf32 = True
+     torch.set_grad_enabled(False)
+     device = "cuda:0"
+-    save_frames = False
+-    datetime_now = str(datetime.datetime.now()).replace(" ", "_")
+ 
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--dataset", default="datasets/tum/rgbd_dataset_freiburg1_desk")
+@@ -228,8 +216,6 @@ if __name__ == "__main__":
+     i = 0
+     fps_timer = time.time()
+ 
+-    frames = []
+-
+     while True:
+         mode = states.get_mode()
+         msg = try_get_msg(viz2main)
+@@ -250,9 +236,7 @@ if __name__ == "__main__":
+             states.set_mode(Mode.TERMINATED)
+             break
+ 
+-        timestamp, img = dataset[i]
+-        if save_frames:
+-            frames.append(img)
++        _, img = dataset[i]
+ 
+         # get frames last camera pose
+         T_WC = (
+@@ -261,6 +245,7 @@ if __name__ == "__main__":
+             else states.get_frame().T_WC
+         )
+         frame = create_frame(i, img, T_WC, img_size=dataset.img_size, device=device)
++        add_new_kf = False
+ 
+         if mode == Mode.INIT:
+             # Initialize via mono inference, and encoded features neeed for database
+@@ -274,7 +259,7 @@ if __name__ == "__main__":
+             continue
+ 
+         if mode == Mode.TRACKING:
+-            add_new_kf, match_info, try_reloc = tracker.track(frame)
++            add_new_kf, _, try_reloc = tracker.track(frame)
+             if try_reloc:
+                 states.set_mode(Mode.RELOC)
+             states.set_frame(frame)
+@@ -321,14 +306,6 @@ if __name__ == "__main__":
+         eval.save_keyframes(
+             save_dir / "keyframes" / seq_name, dataset.timestamps, keyframes
+         )
+-    if save_frames:
+-        savedir = pathlib.Path(f"logs/frames/{datetime_now}")
+-        savedir.mkdir(exist_ok=True, parents=True)
+-        for i, frame in tqdm.tqdm(enumerate(frames), total=len(frames)):
+-            frame = (frame * 255).clip(0, 255)
+-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+-            cv2.imwrite(f"{savedir}/{i}.png", frame)
+-
+     print("done")
+     backend.join()
+     if not args.no_viz:
+diff --git a/mast3r_slam/mast3r_utils.py b/mast3r_slam/mast3r_utils.py
+index 8462fdf..5ffb171 100644
+--- a/mast3r_slam/mast3r_utils.py
++++ b/mast3r_slam/mast3r_utils.py
+@@ -206,7 +206,7 @@ def mast3r_asymmetric_inference(model, frame_i, frame_j):
+     return X, C, D, Q
+ 
+ 
+-def mast3r_match_asymmetric(model, frame_i, frame_j, idx_i2j_init=None):
++def mast3r_match_asymmetric(model, frame_i, frame_j, idx_i2j_init=None, return_descriptors=False):
+     X, C, D, Q = mast3r_asymmetric_inference(model, frame_i, frame_j)
+ 
+     b, h, w = X.shape[:-1]
+@@ -228,7 +228,11 @@ def mast3r_match_asymmetric(model, frame_i, frame_j, idx_i2j_init=None):
+     Dii, Dji = einops.rearrange(D, "b h w c -> b (h w) c")
+     Qii, Qji = einops.rearrange(Q, "b h w -> b (h w) 1")
+ 
+-    return idx_i2j, valid_match_j, Xii, Cii, Qii, Xji, Cji, Qji
++    result = (idx_i2j, valid_match_j, Xii, Cii, Qii, Xji, Cji, Qji)
++    if return_descriptors:
++        # Same decoder pair, full HWC maps; no extra forward or feature cache.
++        return result + ((D[0], D[1]),)
++    return result
+ 
+ 
+ def _resize_pil_image(img, long_edge_size):
+diff --git a/mast3r_slam/tracker.py b/mast3r_slam/tracker.py
+index 58a039b..92c3884 100644
+--- a/mast3r_slam/tracker.py
++++ b/mast3r_slam/tracker.py
+@@ -19,6 +19,19 @@ class FrameTracker:
+         self.keyframes = frames
+         self.device = device
+ 
++        self.a = None
++        a_cfg = config.get("a", {})
++        mode = a_cfg.get("mode", "off")
++        if mode not in ("off", "diagnostic", "weighted"):
++            raise ValueError("A mode must be off, diagnostic, or weighted")
++        if mode != "off":
++            if not config["use_calib"] or config["dataset"]["img_downsample"] != 1:
++                raise ValueError("A a001 requires known calibration and img_downsample=1")
++            from mast3r_slam.reliability import FrontendReliability
++            self.a = FrontendReliability(a_cfg)
++        else:
++            print("A_CONFIG mode=off", flush=True)
++
+         self.reset_idx_f2k()
+ 
+     # Initialize with identity indexing of size (1,n)
+@@ -28,9 +41,16 @@ class FrameTracker:
+     def track(self, frame: Frame):
+         keyframe = self.keyframes.last_keyframe()
+ 
+-        idx_f2k, valid_match_k, Xff, Cff, Qff, Xkf, Ckf, Qkf = mast3r_match_asymmetric(
+-            self.model, frame, keyframe, idx_i2j_init=self.idx_f2k
+-        )
++        if self.a is None:
++            matches = mast3r_match_asymmetric(
++                self.model, frame, keyframe, idx_i2j_init=self.idx_f2k
++            )
++        else:
++            matches = mast3r_match_asymmetric(
++                self.model, frame, keyframe, idx_i2j_init=self.idx_f2k,
++                return_descriptors=True,
++            )
++        idx_f2k, valid_match_k, Xff, Cff, Qff, Xkf, Ckf, Qkf = matches[:8]
+         # Save idx for next
+         self.idx_f2k = idx_f2k.clone()
+ 
+@@ -66,9 +86,12 @@ class FrameTracker:
+ 
+         match_frac = valid_opt.sum() / valid_opt.numel()
+         if match_frac < self.cfg["min_match_frac"]:
++            if self.a is not None:
++                self.a.initial_failure(frame.frame_id, "initial_insufficient_matches")
+             print(f"Skipped frame {frame.frame_id}")
+             return False, [], True
+ 
++        initial_status = {} if self.a is not None else None
+         try:
+             # Track
+             if not use_calib:
+@@ -87,11 +110,20 @@ class FrameTracker:
+                     valid_meas_k,
+                     K,
+                     img_size,
++                    **({"status": initial_status} if self.a is not None else {}),
+                 )
+         except Exception as e:
++            if self.a is not None:
++                self.a.initial_failure(frame.frame_id, "initial_solver_failure")
+             print(f"Cholesky failed {frame.frame_id}")
+             return False, [], True
+ 
++        if self.a is not None:
++            T_WCf, T_CkCf = self.a.run(
++                self, frame.frame_id, matches[8], idx_f2k, Xf, Xk, Ck,
++                T_WCf, T_WCk, T_CkCf, Qk, valid_opt, meas_k, valid_meas_k,
++                K, img_size, initial_status, target_frame_id=int(keyframe.frame_id),
++            )
+         frame.T_WC = T_WCf
+ 
+         # Use pose to transform points to update keyframe
+@@ -153,11 +185,14 @@ class FrameTracker:
+ 
+         return Xf[idx_f2k], Xk, T_WCf, T_WCk, Cf[idx_f2k], Ck, meas_k, valid_meas_k
+ 
+-    def solve(self, sqrt_info, r, J):
++    def solve(self, sqrt_info, r, J, weights=None, refinement=None):
+         whitened_r = sqrt_info * r
+         robust_sqrt_info = sqrt_info * torch.sqrt(
+             huber(whitened_r, k=self.cfg["huber"])
+         )
++        if weights is not None:
++            # Huber sees S0*r first. A scales BOTH residual and Jacobian by sqrt(w).
++            robust_sqrt_info = robust_sqrt_info * torch.sqrt(weights)
+         mdim = J.shape[-1]
+         A = (robust_sqrt_info[..., None] * J).view(-1, mdim)  # dr_dX
+         b = (robust_sqrt_info * r).view(-1, 1)  # z-h
+@@ -165,6 +200,11 @@ class FrameTracker:
+         g = -A.T @ b
+         cost = 0.5 * (b.T @ b).item()
+ 
++        if refinement is not None:
++            from mast3r_slam.reliability import check_normal_matrix
++            check_normal_matrix(H, refinement["max_condition"])
++            if not torch.isfinite(g).all():
++                raise ValueError("nonfinite_gradient")
+         L = torch.linalg.cholesky(H, upper=False)
+         tau_j = torch.cholesky_solve(g, L, upper=False).view(1, -1)
+ 
+@@ -214,7 +254,8 @@ class FrameTracker:
+         return T_WCf, T_CkCf
+ 
+     def opt_pose_calib_sim3(
+-        self, Xf, Xk, T_WCf, T_WCk, Qk, valid, meas_k, valid_meas_k, K, img_size
++        self, Xf, Xk, T_WCf, T_WCk, Qk, valid, meas_k, valid_meas_k, K, img_size,
++        weights=None, refinement=None, status=None,
+     ):
+         last_error = 0
+         sqrt_info_pixel = 1 / self.cfg["sigma_pixel"] * valid * torch.sqrt(Qk)
+@@ -225,7 +266,11 @@ class FrameTracker:
+         T_CkCf = T_WCk.inv() * T_WCf
+ 
+         old_cost = float("inf")
+-        for step in range(self.cfg["max_iters"]):
++        max_iters = self.cfg["max_iters"] if refinement is None else refinement["max_iters"]
++        report = refinement if refinement is not None else status
++        if report is not None:
++            report["converged"] = False
++        for step in range(max_iters):
+             Xf_Ck, dXf_Ck_dT_CkCf = act_Sim3(T_CkCf, Xf, jacobian=True)
+             pzf_Ck, dpzf_Ck_dXf_Ck, valid_proj = project_calib(
+                 Xf_Ck,
+@@ -243,7 +288,12 @@ class FrameTracker:
+             # Jacobian
+             J = -dpzf_Ck_dXf_Ck @ dXf_Ck_dT_CkCf
+ 
+-            tau_ij_sim3, new_cost = self.solve(sqrt_info2, r, J)
++            if weights is None:
++                tau_ij_sim3, new_cost = self.solve(sqrt_info2, r, J)
++            else:
++                tau_ij_sim3, new_cost = self.solve(sqrt_info2, r, J, weights, refinement)
++            if report is not None:
++                report["steps"] = step + 1
+             T_CkCf = T_CkCf.retr(tau_ij_sim3)
+ 
+             if check_convergence(
+@@ -254,10 +304,12 @@ class FrameTracker:
+                 new_cost,
+                 tau_ij_sim3,
+             ):
++                if report is not None:
++                    report["converged"] = True
+                 break
+             old_cost = new_cost
+ 
+-            if step == self.cfg["max_iters"] - 1:
++            if step == max_iters - 1:
+                 print(f"max iters reached {last_error}")
+ 
+         # Assign new pose based on relative pose

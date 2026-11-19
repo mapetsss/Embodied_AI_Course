@@ -1,0 +1,29 @@
+--- a/mast3r_slam/backend/src/gn_kernels.cu
++++ b/mast3r_slam/backend/src/gn_kernels.cu
+@@ -799,7 +799,7 @@
+ 
+     // Termination criteria
+     // Need to specify this second argument otherwise ambiguous function call...
+-    delta_norm = torch::linalg::linalg_norm(dx, std::optional<c10::Scalar>(), {}, false, {});
++    delta_norm = at::linalg_norm(dx, std::optional<c10::Scalar>(), {}, false, {});
+     if (delta_norm.item<float>() < delta_thresh) {
+       break;
+     }
+@@ -1216,7 +1216,7 @@
+ 
+     // Termination criteria
+     // Need to specify this second argument otherwise ambiguous function call...
+-    delta_norm = torch::linalg::linalg_norm(dx, std::optional<c10::Scalar>(), {}, false, {});
++    delta_norm = at::linalg_norm(dx, std::optional<c10::Scalar>(), {}, false, {});
+     if (delta_norm.item<float>() < delta_thresh) {
+       break;
+     }
+@@ -1626,7 +1626,7 @@
+ 
+     // Termination criteria
+     // Need to specify this second argument otherwise ambiguous function call...
+-    delta_norm = torch::linalg::linalg_norm(dx, std::optional<c10::Scalar>(), {}, false, {});
++    delta_norm = at::linalg_norm(dx, std::optional<c10::Scalar>(), {}, false, {});
+     if (delta_norm.item<float>() < delta_thresh) {
+       break;
+     }

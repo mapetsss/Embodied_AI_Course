@@ -1,0 +1,112 @@
+{
+  "release": "a001",
+  "scope": "A two-view calibrated frontend prototype",
+  "upstream_ref": "e6f4e3d474fad0e11f561482012be864ba8c3f17",
+  "lietorch_ref": "e7df86554156b36846008d8ddbcc4d8521a16554",
+  "delta_base": "fixed commit + exactly the three required guide compatibility patches",
+  "compatibility_patches": [
+    {
+      "name": "blackwell-compat.patch",
+      "sha256": "20d76485cb782f09f15b232617b6a932a5d937b21547496a5f8ad84f9e020e1d"
+    },
+    {
+      "name": "pytorch27-linalg.patch",
+      "sha256": "0ce9af3ae22ee01589c7f93d2d8e01bbc4271f3e018cff21f78622a966b92f7d"
+    },
+    {
+      "name": "pytorch27-retrieval-load.patch",
+      "sha256": "ef7bf5c574e468e15435524f454cc799499bd39deaa44e577480ea80bc4403ee"
+    }
+  ],
+  "compatibility_files": [
+    {
+      "path": "setup.py",
+      "sha256": "b514723f4931c693248705b8c82268f5a35e5a30d0cd6664d796b6ab444a8a9a"
+    },
+    {
+      "path": "mast3r_slam/backend/src/matching_kernels.cu",
+      "sha256": "2cdf3030433e292e2389e1003ce4e08dd16bf3891c3e077ec9b7aa2b247b9da6"
+    },
+    {
+      "path": "thirdparty/mast3r/dust3r/croco/models/curope/kernels.cu",
+      "sha256": "0ae1a9517eba744fd619f98b3761766d384ab090d35df4314d8946db72c5ca51"
+    },
+    {
+      "path": "thirdparty/mast3r/mast3r/model.py",
+      "sha256": "8e8d1b26efe3f12af82a84c3963d2df878d10c38b9f5adf885434e410e1e6a51"
+    },
+    {
+      "path": "thirdparty/mast3r/mast3r/retrieval/model.py",
+      "sha256": "6b360e2a36005311a4d12b3dcbc774443cd5e262485c22e6dad23c1989d6c1e2"
+    },
+    {
+      "path": "mast3r_slam/backend/src/gn_kernels.cu",
+      "sha256": "782256d5bbd20b875dd58f3c8f2ee96ba133aabd3c006b3d75b230205e2f9603"
+    },
+    {
+      "path": "thirdparty/mast3r/mast3r/retrieval/processor.py",
+      "sha256": "e0f34d32c00c949e9224e43fa7f2a73d5d0ec43c79d27542b066e596391687d2"
+    }
+  ],
+  "submodules": {
+    "thirdparty/eigen": "bddaa99e151244402c6e804e01b970288650da6b",
+    "thirdparty/in3d/thirdparty/pyimgui": "c79137d6c47040e6ce226f8109868a3018d5354b",
+    "thirdparty/in3d/thirdparty/pyimgui/imgui-cpp": "35b1148efb839381b84de9290d9caf0b66ad7d03"
+  },
+  "files": [
+    {
+      "path": "mast3r_slam/mast3r_utils.py",
+      "added": false,
+      "before_sha256": "89417b10642962dc5a51cc6a255ae54ebe2635ff9e456b0d1a9f5276b29c1201",
+      "after_sha256": "816526fe2106a4de879c0565abf0e80ad47c1fb3de7241c66986d07927c53a74"
+    },
+    {
+      "path": "mast3r_slam/tracker.py",
+      "added": false,
+      "before_sha256": "8689a37d60dc3935586cf9d529841229fe7d7f70b220fbd01f3346785932e296",
+      "after_sha256": "f65d153f37f780e79f510d471226d9348e74168b55cb98becc82bcf61a6ec68d"
+    },
+    {
+      "path": "mast3r_slam/reliability.py",
+      "added": true,
+      "before_sha256": null,
+      "after_sha256": "b71ee154ac408724badf5306a40766802844527ffd47f49dcdbbdb04df881892"
+    },
+    {
+      "path": "config/a_off.yaml",
+      "added": true,
+      "before_sha256": null,
+      "after_sha256": "ac3ad90533cee505e0577e6eb82a7280bbaa05de5bacf76e1dd51e459935d2c0"
+    },
+    {
+      "path": "config/a_diagnostic.yaml",
+      "added": true,
+      "before_sha256": null,
+      "after_sha256": "d3bbdc4a4b59c6a5742672f5489fd0aed6d0257cb24fbdcae36434254d7ba24c"
+    },
+    {
+      "path": "config/a_weighted.yaml",
+      "added": true,
+      "before_sha256": null,
+      "after_sha256": "100899c44e567e91f92c321628eb8af826bcfc8336718cbdeb76787526c0a6d4"
+    }
+  ],
+  "dependencies_added": [],
+  "binary_or_backend_interface_changed": false,
+  "local_checks": [
+    "Python 3.11 syntax",
+    "YAML inheritance and off protocol equality",
+    "CPU synthetic numerical and rollback checks",
+    "source-only deployment conflict/rollback/hash fixtures"
+  ],
+  "target_checks_executed": false,
+  "target_pending": [
+    "module origins + spawn",
+    "actual CUDA kernels",
+    "real model + full SLAM",
+    "off regression",
+    "diagnostic inspection",
+    "weighted comparison + evo -as"
+  ],
+  "no_ate_or_speed_claim": true
+}

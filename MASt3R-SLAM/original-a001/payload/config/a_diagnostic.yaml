@@ -1,0 +1,24 @@
+inherit: "config/eval_calib.yaml"
+a:
+  mode: diagnostic
+  temperature: 0.3
+  min_weight: 0.05
+  depth_abs_tol: 0.05
+  depth_rel_tol: 0.10
+  min_support: 64
+  min_evidence_fraction: 0.2
+  min_high_fraction: 0.1
+  high_weight: 0.25
+  min_mean_weight: 0.2
+  min_cells: 4
+  max_initial_pixel_error: 8.0
+  max_initial_log_depth_error: 0.5
+  max_refine_iters: 5
+  max_condition: 1e7
+  max_translation_depth_ratio: 0.1
+  max_rotation: 0.15
+  max_log_scale: 0.1
+  max_pixel_error_ratio: 1.25
+  pixel_error_slack: 0.5
+  save_every: 30
+  max_diagnostics: 8

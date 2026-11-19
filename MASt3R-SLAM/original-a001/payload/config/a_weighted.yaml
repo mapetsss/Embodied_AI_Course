@@ -1,0 +1,3 @@
+inherit: "config/a_diagnostic.yaml"
+a:
+  mode: weighted

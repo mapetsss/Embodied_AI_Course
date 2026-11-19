@@ -1,0 +1,61 @@
+--- a/setup.py
++++ b/setup.py
+@@ -28,12 +28,8 @@
+     sources.append("mast3r_slam/backend/src/matching_kernels.cu")
+     extra_compile_args["nvcc"] = [
+         "-O3",
+-        "-gencode=arch=compute_60,code=sm_60",
+-        "-gencode=arch=compute_61,code=sm_61",
+-        "-gencode=arch=compute_70,code=sm_70",
+-        "-gencode=arch=compute_75,code=sm_75",
+-        "-gencode=arch=compute_80,code=sm_80",
+-        "-gencode=arch=compute_86,code=sm_86",
++        "-gencode=arch=compute_120,code=sm_120",
++        "-gencode=arch=compute_120,code=compute_120",
+     ]
+     ext_modules = [
+         CUDAExtension(
+--- a/mast3r_slam/backend/src/matching_kernels.cu
++++ b/mast3r_slam/backend/src/matching_kernels.cu
+@@ -100,7 +100,7 @@
+   torch::Tensor p1_new = torch::zeros(
+     {batch_size, n, 2}, opts);
+ 
+-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(D11.type(), "refine_matches_kernel", ([&] {
++  AT_DISPATCH_FLOATING_TYPES_AND_HALF(D11.scalar_type(), "refine_matches_kernel", ([&] {
+     refine_matches_kernel<scalar_t><<<blocks, threads>>>(
+       D11.packed_accessor32<scalar_t,4,torch::RestrictPtrTraits>(),
+       D21.packed_accessor32<scalar_t,3,torch::RestrictPtrTraits>(),
+--- a/thirdparty/mast3r/dust3r/croco/models/curope/kernels.cu
++++ b/thirdparty/mast3r/dust3r/croco/models/curope/kernels.cu
+@@ -98,7 +98,7 @@
+     const int N_BLOCKS = B * N; // each block takes care of H*D values
+     const int SHARED_MEM = sizeof(float) * (D + D/4);
+ 
+-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(tokens.type(), "rope_2d_cuda", ([&] {
++    AT_DISPATCH_FLOATING_TYPES_AND_HALF(tokens.scalar_type(), "rope_2d_cuda", ([&] {
+         rope_2d_cuda_kernel<scalar_t> <<<N_BLOCKS, THREADS_PER_BLOCK, SHARED_MEM>>> (
+             //tokens.data_ptr<scalar_t>(), 
+             tokens.packed_accessor32<scalar_t,4,torch::RestrictPtrTraits>(),
+--- a/thirdparty/mast3r/mast3r/model.py
++++ b/thirdparty/mast3r/mast3r/model.py
+@@ -21,7 +21,7 @@
+ def load_model(model_path, device, verbose=True):
+     if verbose:
+         print('... loading model from', model_path)
+-    ckpt = torch.load(model_path, map_location='cpu')
++    ckpt = torch.load(model_path, map_location='cpu', weights_only=False)
+     args = ckpt['args'].model.replace("ManyAR_PatchEmbed", "PatchEmbedDust3R")
+     if 'landscape_only' not in args:
+         args = args[:-1] + ', landscape_only=False)'
+--- a/thirdparty/mast3r/mast3r/retrieval/model.py
++++ b/thirdparty/mast3r/mast3r/retrieval/model.py
+@@ -136,7 +136,7 @@
+         self.nfeat = nfeat
+         self.pretrained_retrieval = pretrained_retrieval
+         if self.pretrained_retrieval is not None:
+-            ckpt = torch.load(pretrained_retrieval, 'cpu')
++            ckpt = torch.load(pretrained_retrieval, 'cpu', weights_only=False)
+             msg = self.load_state_dict(ckpt['model'], strict=False)
+             assert len(msg.unexpected_keys) == 0 and all(k.startswith('backbone')
+                                                          or k.startswith('postwhiten') for k in msg.missing_keys)

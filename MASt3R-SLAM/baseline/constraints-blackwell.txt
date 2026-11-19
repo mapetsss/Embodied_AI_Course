@@ -1,0 +1,8 @@
+# RTX 5070 Ti 适配环境。与官方 README 的 PyTorch 2.5.1 环境分开记录。
+torch==2.7.1
+torchvision==0.22.1
+torchaudio==2.7.1
+numpy==1.26.4
+opencv-python==4.11.0.86
+setuptools==70.0.0
+Cython<3
